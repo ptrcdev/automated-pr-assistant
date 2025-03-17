@@ -1,5 +1,4 @@
 import { Controller, Post, Body, Headers, HttpException, HttpStatus, Logger } from '@nestjs/common';
-import { StaticAnalysisService } from '../static-analysis/static-analysis.service';
 import fetch from 'node-fetch'; // Make sure to install node-fetch if you're using Node 16 or below
 
 interface PythonResponse {
@@ -42,7 +41,7 @@ export class WebhookController {
         const fileContent = commit.message || "No content provided";
 
         this.logger.log(`Processing file: ${filename}`);
-        
+
         let aiFeedback = "";
         try {
           const pythonResponse = await fetch(pythonApiUrl, {
