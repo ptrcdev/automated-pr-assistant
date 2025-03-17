@@ -30,21 +30,19 @@ export class WebhookController {
     this.logger.log(`Received webhook event: ${event}`);
 
     const commits: Commit[] = payload.commits || [];
-    const pythonApiUrl = process.env.PYTHON_API_URL;
+    const pythonApiUrl = process.env.PYTHON_API_URL || "http://localhost:8000/analyze";
     if (!pythonApiUrl) {
       this.logger.error("Python API URL is not configured");
       throw new HttpException("Python API URL is not configured", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
-    // Use Promise.all to process files in parallel per commit.
     const fileAnalysesPromises = commits.flatMap(commit => {
-      // Use modified files if available
       const modifiedFiles = commit.modified || [];
       return modifiedFiles.map(async filename => {
-        // If the payload includes file content, use that; otherwise, use commit message as a fallback.
-        // Replace this with the actual extraction logic.
         const fileContent = commit.message || "No content provided";
 
+        this.logger.log(`Processing file: ${filename}`);
+        
         let aiFeedback = "";
         try {
           const pythonResponse = await fetch(pythonApiUrl, {
