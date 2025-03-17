@@ -13,9 +13,12 @@ interface FileAnalysis {
 interface Commit {
   id: string;
   message: string;
-  modified?: string[];
-  // Optionally, if available:
-  files?: { filename: string; diff: string }[];
+  modified: string[];
+}
+
+interface GitHubFile {
+  filename: string;
+  patch?: string;
 }
 
 @Controller('webhook')
@@ -32,100 +35,103 @@ export class WebhookController {
 
     const commits: Commit[] = payload.commits || [];
     const pythonApiUrl = process.env.PYTHON_API_URL || "http://localhost:8000/analyze";
-
+    const githubToken = process.env.GITHUB_API_TOKEN;
+    
     if (!pythonApiUrl) {
       this.logger.error("Python API URL is not configured");
       throw new HttpException("Python API URL is not configured", HttpStatus.INTERNAL_SERVER_ERROR);
     }
+    if (!githubToken) {
+      this.logger.error("GitHub token is not configured");
+      throw new HttpException("GitHub token is not configured", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
+    
+    // Extract repository details from the payload
+    const repoFullName = payload.repository?.full_name;
+    if (!repoFullName) {
+      this.logger.error("Repository information is missing in payload");
+      throw new HttpException("Repository information is missing", HttpStatus.BAD_REQUEST);
+    }
+    const [owner, repo] = repoFullName.split('/');
 
-    console.log(commits);
-
-    const fileAnalysesPromises = commits.flatMap(commit => {
-      // If the payload includes a 'files' array with diffs, use it.
-      if (commit.files && Array.isArray(commit.files)) {
-        return commit.files.map(async (file) => {
-          const fileContent = file.diff;
-          this.logger.log(`Processing file ${file.filename} with diff length ${fileContent.length}`);
-          
-          if (fileContent.length < this.MIN_CONTENT_LENGTH) {
-            this.logger.log(`Skipping file ${file.filename} due to insufficient diff length`);
-            return {
-              filename: file.filename,
-              aiFeedback: "Insufficient changes to analyze.",
-            } as FileAnalysis;
-          }
-          
-          let aiFeedback = "";
-          try {
-            const pythonResponse = await fetch(pythonApiUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                content: fileContent,
-                context: "code review",
-              }),
-            });
-            if (!pythonResponse.ok) {
-              throw new Error(`Python API error: ${pythonResponse.statusText}`);
-            }
-            const data: PythonResponse = await pythonResponse.json() as PythonResponse;
-            aiFeedback = data.openai_feedback;
-          } catch (err: any) {
-            this.logger.error(`Error fetching AI feedback for file ${file.filename}: ${err.message}`);
-            aiFeedback = `Error fetching AI feedback: ${err.message}`;
-          }
-          return {
-            filename: file.filename,
-            aiFeedback,
-          } as FileAnalysis;
+    // For each commit, fetch the diff details using GitHub's API.
+    const fileAnalysesPromises = commits.flatMap(async (commit) => {
+      // GitHub API URL to fetch commit details
+      const commitUrl = `https://api.github.com/repos/${owner}/${repo}/commits/${commit.id}`;
+      let commitDetails;
+      try {
+        const ghResponse = await fetch(commitUrl, {
+          headers: {
+            'Authorization': `token ${githubToken}`,
+            'Accept': 'application/vnd.github.v3+json',
+          },
         });
-      } else {
-        // Fallback: use commit.modified array and commit.message as content.
-        const modifiedFiles = commit.modified || [];
-        return modifiedFiles.map(async filename => {
-          // Use commit.message as a fallback; ideally, you'd fetch the actual file diff via GitHub API.
-          const fileContent = commit.message || "";
-          this.logger.log(`Processing file ${filename} using commit message with length ${fileContent.length}`);
-          
-          if (fileContent.length < 10) {
-            this.logger.log(`Skipping file ${filename} due to insufficient content length`);
-            return {
-              filename,
-              aiFeedback: "Insufficient content to analyze.",
-            } as FileAnalysis;
-          }
-          
-          let aiFeedback = "";
-          try {
-            const pythonResponse = await fetch(pythonApiUrl, {
-              method: "POST",
-              headers: { "Content-Type": "application/json" },
-              body: JSON.stringify({
-                content: fileContent,
-                context: "code review",
-              }),
-            });
-            if (!pythonResponse.ok) {
-              throw new Error(`Python API error: ${pythonResponse.statusText}`);
-            }
-            const data: PythonResponse = await pythonResponse.json() as PythonResponse;
-            aiFeedback = data.openai_feedback;
-          } catch (err: any) {
-            this.logger.error(`Error fetching AI feedback for file ${filename}: ${err.message}`);
-            aiFeedback = `Error fetching AI feedback: ${err.message}`;
-          }
+        if (!ghResponse.ok) {
+          throw new Error(`GitHub API error: ${ghResponse.statusText}`);
+        }
+        commitDetails = await ghResponse.json();
+      } catch (err: any) {
+        this.logger.error(`Error fetching commit details for commit ${commit.id}: ${err.message}`);
+        return []; // Skip processing this commit
+      }
+      
+      // Extract changed files from the commit details
+      const files: GitHubFile[] = commitDetails.files || [];
+      
+      return commit.modified.map(async (filename) => {
+        const fileData = files.find((f) => f.filename === filename);
+        if (!fileData || !fileData.patch) {
+          this.logger.log(`Skipping file ${filename} because diff is not available`);
           return {
             filename,
-            aiFeedback,
+            aiFeedback: "Diff not available for analysis.",
           } as FileAnalysis;
-        });
-      }
+        }
+        
+        const diffContent = fileData.patch;
+        this.logger.log(`Processing file ${filename} with diff length ${diffContent.length}`);
+        
+        if (diffContent.length < this.MIN_CONTENT_LENGTH) {
+          this.logger.log(`Skipping file ${filename} due to insufficient diff content`);
+          return {
+            filename,
+            aiFeedback: "Insufficient diff content to analyze.",
+          } as FileAnalysis;
+        }
+        
+        let aiFeedback = "";
+        try {
+          const pythonResponse = await fetch(pythonApiUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              content: diffContent,
+              context: "code review",
+            }),
+          });
+          if (!pythonResponse.ok) {
+            throw new Error(`Python API error: ${pythonResponse.statusText}`);
+          }
+          const data: PythonResponse = await pythonResponse.json() as PythonResponse;
+          aiFeedback = data.openai_feedback;
+        } catch (err: any) {
+          this.logger.error(`Error fetching AI feedback for file ${filename}: ${err.message}`);
+          aiFeedback = `Error fetching AI feedback: ${err.message}`;
+        }
+        
+        return {
+          filename,
+          aiFeedback,
+        } as FileAnalysis;
+      });
     });
-
-    const fileAnalyses: FileAnalysis[] = await Promise.all(fileAnalysesPromises);
+    
+    // Flatten the promises array and await them
+    const flattenedPromises = fileAnalysesPromises.flat();
+    const fileAnalyses = await Promise.all(flattenedPromises);
 
     this.logger.log({
-      message: 'Webhook received',
+      message: 'Webhook processed',
       fileAnalyses,
     });
 
