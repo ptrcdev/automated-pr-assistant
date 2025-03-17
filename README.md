@@ -112,6 +112,17 @@ The Automated Code Review Assistant NestJS API is designed to automate part of t
 
 ## Usage
 
+To use this webhook with your own repository, you will need to:
+
+1. **Set up the webhook in your repository:**
+   - Go to your repository's settings.
+   - Find the webhook section and add a new webhook.
+   - Set the payload URL to the endpoint of this NestJS API. Public domain: https://automated-pr-assistant-production.up.railway.app
+   - Choose the events you want to trigger the webhook (e.g., push events).
+   - Select the content type as JSON.
+
+If you enter the public domain as the payload for your webhook, every time you make a commit, it will send you an email with the Code Review.
+
 ### Webhook Endpoint
 
 The API exposes a POST /webhook endpoint. This endpoint is designed to be used with GitHub/GitLab webhooks.
@@ -177,3 +188,4 @@ Ensure that your application listens on the port provided by the deployment envi
   Optionally build a Next.js dashboard to display historical analysis reports.
 - **Notifications:**
   Integrate with email or Slack APIs to send alerts when critical code quality issues are detected.
+
