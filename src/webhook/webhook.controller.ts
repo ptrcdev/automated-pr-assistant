@@ -32,6 +32,7 @@ export class WebhookController {
     const commits: Commit[] = payload.commits || [];
     const pythonApiUrl = process.env.PYTHON_API_URL;
     if (!pythonApiUrl) {
+      this.logger.error("Python API URL is not configured");
       throw new HttpException("Python API URL is not configured", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
