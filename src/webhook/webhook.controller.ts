@@ -43,6 +43,8 @@ export class WebhookController {
       throw new HttpException(`Failed to get AI feedback: ${err.message}`, HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
+    console.log('AI Feedback:', aiFeedback);
+
     // Return the aggregated result.
     return {
       message: 'Webhook received',

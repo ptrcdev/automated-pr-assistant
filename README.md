@@ -1,99 +1,179 @@
-<p align="center">
-  <a href="http://nestjs.com/" target="blank"><img src="https://nestjs.com/img/logo-small.svg" width="120" alt="Nest Logo" /></a>
-</p>
+# Automated Code Review Assistant - NestJS API
 
-[circleci-image]: https://img.shields.io/circleci/build/github/nestjs/nest/master?token=abc123def456
-[circleci-url]: https://circleci.com/gh/nestjs/nest
+This NestJS API acts as the backend gateway for the Automated Code Review Assistant project. It receives Git webhook events, performs static code analysis using ESLint (or similar tools), and forwards code snippets to a Python AI feedback service (via a REST API) for detailed, contextual review feedback. The API then aggregates these results and returns a unified report.
 
-  <p align="center">A progressive <a href="http://nodejs.org" target="_blank">Node.js</a> framework for building efficient and scalable server-side applications.</p>
-    <p align="center">
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/v/@nestjs/core.svg" alt="NPM Version" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/l/@nestjs/core.svg" alt="Package License" /></a>
-<a href="https://www.npmjs.com/~nestjscore" target="_blank"><img src="https://img.shields.io/npm/dm/@nestjs/common.svg" alt="NPM Downloads" /></a>
-<a href="https://circleci.com/gh/nestjs/nest" target="_blank"><img src="https://img.shields.io/circleci/build/github/nestjs/nest/master" alt="CircleCI" /></a>
-<a href="https://coveralls.io/github/nestjs/nest?branch=master" target="_blank"><img src="https://coveralls.io/repos/github/nestjs/nest/badge.svg?branch=master#9" alt="Coverage" /></a>
-<a href="https://discord.gg/G7Qnnhy" target="_blank"><img src="https://img.shields.io/badge/discord-online-brightgreen.svg" alt="Discord"/></a>
-<a href="https://opencollective.com/nest#backer" target="_blank"><img src="https://opencollective.com/nest/backers/badge.svg" alt="Backers on Open Collective" /></a>
-<a href="https://opencollective.com/nest#sponsor" target="_blank"><img src="https://opencollective.com/nest/sponsors/badge.svg" alt="Sponsors on Open Collective" /></a>
-  <a href="https://paypal.me/kamilmysliwiec" target="_blank"><img src="https://img.shields.io/badge/Donate-PayPal-ff3f59.svg" alt="Donate us"/></a>
-    <a href="https://opencollective.com/nest#sponsor"  target="_blank"><img src="https://img.shields.io/badge/Support%20us-Open%20Collective-41B883.svg" alt="Support us"></a>
-  <a href="https://twitter.com/nestframework" target="_blank"><img src="https://img.shields.io/twitter/follow/nestframework.svg?style=social&label=Follow" alt="Follow us on Twitter"></a>
-</p>
-  <!--[![Backers on Open Collective](https://opencollective.com/nest/backers/badge.svg)](https://opencollective.com/nest#backer)
-  [![Sponsors on Open Collective](https://opencollective.com/nest/sponsors/badge.svg)](https://opencollective.com/nest#sponsor)-->
+---
 
-## Description
+## Table of Contents
 
-[Nest](https://github.com/nestjs/nest) framework TypeScript starter repository.
+- [Overview](#overview)
+- [Features](#features)
+- [Technologies](#technologies)
+- [Architecture](#architecture)
+- [Setup and Installation](#setup-and-installation)
+- [Usage](#usage)
+- [Deployment](#deployment)
+- [Future Improvements](#future-improvements)
+- [License](#license)
 
-## Project setup
+---
 
-```bash
-$ pnpm install
+## Overview
+
+The Automated Code Review Assistant NestJS API is designed to automate part of the code review process. When a Git event (such as a commit or pull request) is received, the API:
+
+- Extracts code snippets (e.g., commit messages or diffs) from the webhook payload.
+- Performs static analysis to generate quantitative quality metrics.
+- Calls an external Python AI service that leverages OpenAI to provide qualitative feedback and actionable suggestions.
+- Aggregates both the static scores and AI feedback into a comprehensive report.
+
+---
+
+## Features
+
+- **Webhook Integration:**  
+  Listens for GitHub/GitLab webhook events to trigger automated analysis.
+  
+- **Static Analysis:**  
+  Analyzes code snippets using static analysis tools to assess aspects like formatting, structure, readability, and more.
+
+- **AI-Powered Feedback:**  
+  Forwards code snippets to a Python service that returns detailed, contextual improvement suggestions using OpenAI.
+
+- **Unified Reporting:**  
+  Aggregates static analysis scores and AI-generated feedback into a single, structured response.
+
+---
+
+## Technologies
+
+- **NestJS:** For building a scalable and modular backend API.
+- **Multer:** Middleware for handling file uploads (if needed for code files).
+- **ESLint (or similar):** For static code analysis.
+- **node-fetch:** For making HTTP requests to external services (Python AI service).
+- **dotenv:** For managing environment variables.
+- **TypeScript:** For strong typing and modern JavaScript features.
+
+---
+
+## Architecture
+
+1. **Webhook Endpoint:**  
+   A controller listens for Git webhook events, extracts code snippets from the payload, and triggers the analysis process.
+
+2. **Static Analysis Module:**  
+   A dedicated service performs static code analysis and returns quality metrics (e.g., scores for formatting, readability, etc.).
+
+3. **AI Feedback Integration:**  
+   The API forwards the extracted code snippet to a Python AI service (configured via an environment variable) which returns detailed improvement feedback.
+
+4. **Aggregation & Reporting:**  
+   Combines static analysis scores and AI feedback into a unified report that is sent back to the client or further processed.
+
+---
+
+## Setup and Installation
+
+### Prerequisites
+
+- Node.js (v16 or higher)
+- npm or yarn
+- Git
+
+### Steps
+
+1. **Clone the Repository:**
+
+   ```bash
+   git clone https://github.com/your-username/automated-code-review-api.git
+   cd automated-code-review-api
+   ```
+
+2. **Install Dependencies:**
+
+   ```bash
+   pnpm install
+   ```
+
+3. **Configure Environment Variables:**
+
+   Create a `.env` file in the root directory and add the following variables:
+
+   ```
+   PORT=3000
+   PYTHON_API_URL=http://localhost:8000
+   ```
+
+4. **Run the Application Locally:**
+
+   ```bash
+   pnpm run start:dev
+   ```
+
+## Usage
+
+### Webhook Endpoint
+
+The API exposes a POST /webhook endpoint. This endpoint is designed to be used with GitHub/GitLab webhooks.
+
+Example Request Payload (simplified):
+
+```json
+{
+  "commits": [
+    {
+      "message": "Fixed bug in authentication flow"
+    }
+  ]
+}
 ```
 
-## Compile and run the project
+Response Example:
 
-```bash
-# development
-$ pnpm run start
-
-# watch mode
-$ pnpm run start:dev
-
-# production mode
-$ pnpm run start:prod
+```json
+{
+  "message": "Webhook received",
+  "analysis": {
+    "staticScores": {
+      "formatting": 80,
+      "content_quality": 75,
+      "structure": 70,
+      "keyword_optimization": 65,
+      "readability": 60,
+      "achievements": 85,
+      "professionalism": 90
+    },
+    "aiFeedback": "Detailed feedback generated by OpenAI..."
+  }
+}
 ```
 
-## Run tests
+### Testing
 
+You can test the endpoint using Postman or by configuring a Git webhook with a tool like ngrok to expose your local server to the internet.
+
+### Deployment
+
+For free deployment, consider platforms such as Railway, Heroku, or Render. Make sure to:
+
+Set your environment variables on the platform.
+
+Use a Procfile if required (e.g., for Heroku):
 ```bash
-# unit tests
-$ pnpm run test
-
-# e2e tests
-$ pnpm run test:e2e
-
-# test coverage
-$ pnpm run test:cov
+web: npm run start:prod
 ```
 
-## Deployment
+Ensure that your application listens on the port provided by the deployment environment (using process.env.PORT).
 
-When you're ready to deploy your NestJS application to production, there are some key steps you can take to ensure it runs as efficiently as possible. Check out the [deployment documentation](https://docs.nestjs.com/deployment) for more information.
+## Future Improvements
 
-If you are looking for a cloud-based platform to deploy your NestJS application, check out [Mau](https://mau.nestjs.com), our official platform for deploying NestJS applications on AWS. Mau makes deployment straightforward and fast, requiring just a few simple steps:
-
-```bash
-$ pnpm install -g mau
-$ mau deploy
-```
-
-With Mau, you can deploy your application in just a few clicks, allowing you to focus on building features rather than managing infrastructure.
-
-## Resources
-
-Check out a few resources that may come in handy when working with NestJS:
-
-- Visit the [NestJS Documentation](https://docs.nestjs.com) to learn more about the framework.
-- For questions and support, please visit our [Discord channel](https://discord.gg/G7Qnnhy).
-- To dive deeper and get more hands-on experience, check out our official video [courses](https://courses.nestjs.com/).
-- Deploy your application to AWS with the help of [NestJS Mau](https://mau.nestjs.com) in just a few clicks.
-- Visualize your application graph and interact with the NestJS application in real-time using [NestJS Devtools](https://devtools.nestjs.com).
-- Need help with your project (part-time to full-time)? Check out our official [enterprise support](https://enterprise.nestjs.com).
-- To stay in the loop and get updates, follow us on [X](https://x.com/nestframework) and [LinkedIn](https://linkedin.com/company/nestjs).
-- Looking for a job, or have a job to offer? Check out our official [Jobs board](https://jobs.nestjs.com).
-
-## Support
-
-Nest is an MIT-licensed open source project. It can grow thanks to the sponsors and support by the amazing backers. If you'd like to join them, please [read more here](https://docs.nestjs.com/support).
-
-## Stay in touch
-
-- Author - [Kamil Myśliwiec](https://twitter.com/kammysliwiec)
-- Website - [https://nestjs.com](https://nestjs.com/)
-- Twitter - [@nestframework](https://twitter.com/nestframework)
-
-## License
-
-Nest is [MIT licensed](https://github.com/nestjs/nest/blob/master/LICENSE).
+- Enhanced File Parsing:
+  Add support for parsing different types of code files or diffs beyond commit messages.
+- Authentication:
+  Secure the webhook endpoint to verify the source of the webhook.
+- Detailed Reporting:
+  Improve the aggregation logic to combine more in-depth static analysis metrics with AI feedback.
+- Dashboard Integration:
+  Optionally build a Next.js dashboard to display historical analysis reports.
+- Notifications:
+  Integrate with email or Slack APIs to send alerts when critical code quality issues are detected.
