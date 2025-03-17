@@ -39,7 +39,7 @@ export class WebhookController {
     }
 
     console.log(commits);
-    
+
     const fileAnalysesPromises = commits.flatMap(commit => {
       // If the payload includes a 'files' array with diffs, use it.
       if (commit.files && Array.isArray(commit.files)) {
@@ -87,7 +87,7 @@ export class WebhookController {
           const fileContent = commit.message || "";
           this.logger.log(`Processing file ${filename} using commit message with length ${fileContent.length}`);
           
-          if (fileContent.length < this.MIN_CONTENT_LENGTH) {
+          if (fileContent.length < 10) {
             this.logger.log(`Skipping file ${filename} due to insufficient content length`);
             return {
               filename,
