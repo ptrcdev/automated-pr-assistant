@@ -31,16 +31,11 @@ export class WebhookController {
       // For each commit, get the list of modified files.
       const modifiedFiles = commit.modified || [];
       for (const filename of modifiedFiles) {
-        // Assume you have a way to fetch the content of each file
-        // (This might require additional API calls to GitHub's API)
-        // For this example, we'll simulate by using the commit message if the file is a README,
-        // and a "default" code snippet for main.py.
         let fileContent = "";
 
-        fileContent = commit.message; // Simulated content for README
+        fileContent = commit.message; 
 
-        // Forward each file's content to the Python AI feedback service.
-        const pythonApiUrl = process.env.PYTHON_API_URL || "http://your-python-api-domain/analyze";
+        const pythonApiUrl = process.env.PYTHON_API_URL || "http://localhost:8000/analyze";
         let aiFeedback = "";
         try {
           const pythonResponse = await fetch(pythonApiUrl, {
