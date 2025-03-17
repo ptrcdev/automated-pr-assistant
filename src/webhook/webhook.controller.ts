@@ -1,5 +1,7 @@
 import { Controller, Post, Body, Headers, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import fetch from 'node-fetch';
+import { markdownToHtml } from '../utils/markdown-to-html';
+import { GmailService } from '../gmail/gmail.service';
 
 interface PythonResponse {
   openai_feedback: string;
@@ -9,11 +11,15 @@ interface Commit {
   id: string;
   message: string;
   modified: string[];
+  author: {
+    email: string;
+  };
 }
 
 interface FileAnalysis {
   filename: string;
   aiFeedback: string;
+  commitAuthor?: string;
 }
 
 interface GitHubFile {
@@ -21,11 +27,12 @@ interface GitHubFile {
   patch?: string;
 }
 
-
 @Controller('webhook')
 export class WebhookController {
   private readonly MIN_CONTENT_LENGTH = 50;
   private readonly logger = new Logger(WebhookController.name);
+
+  constructor(private readonly gmailService: GmailService) { }
 
   @Post()
   async handleWebhook(
@@ -37,7 +44,7 @@ export class WebhookController {
     const commits: Commit[] = payload.commits || [];
     const pythonApiUrl = process.env.PYTHON_API_URL || "http://localhost:8000/analyze";
     const githubToken = process.env.GITHUB_TOKEN;
-    
+
     if (!pythonApiUrl) {
       this.logger.error("Python API URL is not configured");
       throw new HttpException("Python API URL is not configured", HttpStatus.INTERNAL_SERVER_ERROR);
@@ -46,8 +53,7 @@ export class WebhookController {
       this.logger.error("GitHub token is not configured");
       throw new HttpException("GitHub token is not configured", HttpStatus.INTERNAL_SERVER_ERROR);
     }
-    
-    // Extract repository details from the payload
+
     const repoFullName = payload.repository?.full_name;
     if (!repoFullName) {
       this.logger.error("Repository information is missing in payload");
@@ -55,11 +61,11 @@ export class WebhookController {
     }
     const [owner, repo] = repoFullName.split('/');
 
-    // Create a flat array of promises for each file in every commit
     const fileAnalysesPromises: Promise<FileAnalysis>[] = [];
 
     for (const commit of commits) {
       const commitUrl = `https://api.github.com/repos/${owner}/${repo}/commits/${commit.id}`;
+      const commitAuthor = commit.author?.email;
       let commitDetails: any;
       try {
         const ghResponse = await fetch(commitUrl, {
@@ -74,9 +80,9 @@ export class WebhookController {
         commitDetails = await ghResponse.json();
       } catch (err: any) {
         this.logger.error(`Error fetching commit details for commit ${commit.id}: ${err.message}`);
-        continue; // Skip this commit if we can't fetch details
+        continue;
       }
-      
+
       const files: GitHubFile[] = commitDetails.files || [];
       for (const filename of commit.modified || []) {
         const fileData = files.find((f) => f.filename === filename);
@@ -93,7 +99,7 @@ export class WebhookController {
 
         const diffContent = fileData.patch;
         this.logger.log(`Processing file ${filename} with diff length ${diffContent.length}`);
-        
+
         if (diffContent.length < this.MIN_CONTENT_LENGTH) {
           this.logger.log(`Skipping file ${filename} due to insufficient diff content`);
           fileAnalysesPromises.push(
@@ -104,7 +110,7 @@ export class WebhookController {
           );
           continue;
         }
-        
+
         fileAnalysesPromises.push(
           (async (): Promise<FileAnalysis> => {
             let aiFeedback = "";
@@ -129,6 +135,7 @@ export class WebhookController {
             return {
               filename,
               aiFeedback,
+              commitAuthor,
             };
           })()
         );
@@ -138,6 +145,20 @@ export class WebhookController {
     const fileAnalyses: FileAnalysis[] = await Promise.all(fileAnalysesPromises);
     this.logger.log({ message: 'Webhook processed', fileAnalyses });
 
+    if (fileAnalyses[0].commitAuthor) {
+      const subject = 'Your Automated Code Review Report';
+      const combinedFeedback = fileAnalyses
+        .map(f => `**${f.filename}:**\n${f.aiFeedback}`)
+        .join('\n\n');
+      const htmlBody = `
+        <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #333;">
+          <h1 style="color: #2c3e50;">Code Review Analysis Report</h1>
+          <p>Your commit has been analyzed. Below is the detailed feedback:</p>
+          ${markdownToHtml(combinedFeedback)}
+        </div>
+      `;
+      await this.gmailService.sendEmail(fileAnalyses[0].commitAuthor, subject, htmlBody);
+    }
     return {
       message: 'Webhook received',
       fileAnalyses,

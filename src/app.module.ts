@@ -1,14 +1,13 @@
 import { Logger, Module } from '@nestjs/common';
-import { AppController } from './app.controller';
-import { AppService } from './app.service';
 import { ConfigModule } from '@nestjs/config';
 import { WebhookController } from './webhook/webhook.controller';
+import { GmailService } from './gmail/gmail.service';
 
 @Module({
   imports: [ConfigModule.forRoot({
     isGlobal: true,
   })],
   controllers: [WebhookController],
-  providers: [Logger],
+  providers: [Logger, GmailService],
 })
 export class AppModule {}
