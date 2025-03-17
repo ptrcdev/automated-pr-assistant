@@ -38,6 +38,8 @@ export class WebhookController {
       throw new HttpException("Python API URL is not configured", HttpStatus.INTERNAL_SERVER_ERROR);
     }
 
+    console.log(commits);
+    
     const fileAnalysesPromises = commits.flatMap(commit => {
       // If the payload includes a 'files' array with diffs, use it.
       if (commit.files && Array.isArray(commit.files)) {
