@@ -2,6 +2,7 @@
 
 This NestJS API acts as the backend gateway for the Automated Code Review Assistant project. It receives Git webhook events, performs static code analysis using ESLint (or similar tools), and forwards code snippets to a Python AI feedback service (via a REST API) for detailed, contextual review feedback. The API then aggregates these results and returns a unified report.
 
+Python AI Service Repo: https://github.com/ptrcdev/feedback-service
 ---
 
 ## Table of Contents
