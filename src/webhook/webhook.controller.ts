@@ -5,6 +5,12 @@ interface PythonResponse {
   openai_feedback: string;
 }
 
+interface Commit {
+  id: string;
+  message: string;
+  modified: string[];
+}
+
 interface FileAnalysis {
   filename: string;
   aiFeedback: string;
@@ -15,11 +21,6 @@ interface GitHubFile {
   patch?: string;
 }
 
-interface Commit {
-  id: string;
-  message: string;
-  modified: string[];
-}
 
 @Controller('webhook')
 export class WebhookController {
@@ -59,7 +60,7 @@ export class WebhookController {
 
     for (const commit of commits) {
       const commitUrl = `https://api.github.com/repos/${owner}/${repo}/commits/${commit.id}`;
-      let commitDetails;
+      let commitDetails: any;
       try {
         const ghResponse = await fetch(commitUrl, {
           headers: {
