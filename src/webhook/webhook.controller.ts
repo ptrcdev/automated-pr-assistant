@@ -19,6 +19,7 @@ export class WebhookController {
     // Extract a code snippet (e.g., commit message or code diff) from the payload.
     const codeSnippet = payload.commits?.[0]?.message || "default code snippet";
     
+    console.log('Code Snippet:', codeSnippet);
     // Run static analysis on the code snippet.
     const staticScores = this.staticAnalysisService.analyzeCode(codeSnippet);
     
