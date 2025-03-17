@@ -1,4 +1,4 @@
-import { Controller, Post, Body, Headers, HttpException, HttpStatus } from '@nestjs/common';
+import { Controller, Post, Body, Headers, HttpException, HttpStatus, Logger } from '@nestjs/common';
 import { StaticAnalysisService } from '../static-analysis/static-analysis.service';
 import fetch from 'node-fetch'; // Make sure to install node-fetch if you're using Node 16 or below
 
@@ -11,31 +11,39 @@ interface FileAnalysis {
   aiFeedback: string;
 }
 
+interface Commit {
+  id: string;
+  message: string;
+  modified: string[];
+}
+
 @Controller('webhook')
 export class WebhookController {
+
+  constructor(private readonly logger: Logger) {}
 
   @Post()
   async handleWebhook(
     @Headers('x-github-event') event: string,
     @Body() payload: any,
   ) {
-    console.log(`Received webhook event: ${event}`);
+    this.logger.log(`Received webhook event: ${event}`);
 
-    // Extract commit data; adjust according to your payload structure.
-    const commits = payload.commits || [];
+    const commits: Commit[] = payload.commits || [];
+    const pythonApiUrl = process.env.PYTHON_API_URL;
+    if (!pythonApiUrl) {
+      throw new HttpException("Python API URL is not configured", HttpStatus.INTERNAL_SERVER_ERROR);
+    }
 
-    // Prepare an array to hold analysis for each file.
-    const fileAnalyses: FileAnalysis[] = [];
-
-    for (const commit of commits) {
-      // For each commit, get the list of modified files.
+    // Use Promise.all to process files in parallel per commit.
+    const fileAnalysesPromises = commits.flatMap(commit => {
+      // Use modified files if available
       const modifiedFiles = commit.modified || [];
-      for (const filename of modifiedFiles) {
-        let fileContent = "";
+      return modifiedFiles.map(async filename => {
+        // If the payload includes file content, use that; otherwise, use commit message as a fallback.
+        // Replace this with the actual extraction logic.
+        const fileContent = commit.message || "No content provided";
 
-        fileContent = commit.message; 
-
-        const pythonApiUrl = process.env.PYTHON_API_URL || "http://localhost:8000/analyze";
         let aiFeedback = "";
         try {
           const pythonResponse = await fetch(pythonApiUrl, {
@@ -51,19 +59,24 @@ export class WebhookController {
           }
           const data: PythonResponse = await pythonResponse.json() as PythonResponse;
           aiFeedback = data.openai_feedback;
-        } catch (err) {
+        } catch (err: any) {
+          this.logger.error(`Error fetching AI feedback for file ${filename}: ${err.message}`);
           aiFeedback = `Error fetching AI feedback: ${err.message}`;
         }
-
-        // Push the analysis for this file into our array.
-        fileAnalyses.push({
+        return {
           filename,
           aiFeedback,
-        });
-      }
-    }
+        } as FileAnalysis;
+      });
+    });
 
-    // Return the aggregated analysis for each file.
+    const fileAnalyses: FileAnalysis[] = await Promise.all(fileAnalysesPromises);
+
+    this.logger.log({
+      message: 'Webhook received',
+      fileAnalyses,
+    });
+
     return {
       message: 'Webhook received',
       fileAnalyses,
