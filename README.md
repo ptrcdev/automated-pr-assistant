@@ -167,13 +167,13 @@ Ensure that your application listens on the port provided by the deployment envi
 
 ## Future Improvements
 
-- Enhanced File Parsing:
+- **Enhanced File Parsing:**
   Add support for parsing different types of code files or diffs beyond commit messages.
-- Authentication:
+- **Authentication:**
   Secure the webhook endpoint to verify the source of the webhook.
-- Detailed Reporting:
+- **Detailed Reporting:**
   Improve the aggregation logic to combine more in-depth static analysis metrics with AI feedback.
-- Dashboard Integration:
+- **Dashboard Integration:**
   Optionally build a Next.js dashboard to display historical analysis reports.
-- Notifications:
+- **Notifications:**
   Integrate with email or Slack APIs to send alerts when critical code quality issues are detected.
