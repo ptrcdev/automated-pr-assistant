@@ -146,7 +146,7 @@ export class WebhookController {
     this.logger.log({ message: 'Webhook processed', fileAnalyses });
 
     if (fileAnalyses[0].commitAuthor) {
-      const subject = 'Your Automated Code Review Report';
+      const subject = 'Your Automated Code Review';
       const combinedFeedback = fileAnalyses
         .map(f => `**${f.filename}:**\n${f.aiFeedback}`)
         .join('\n\n');
