@@ -143,7 +143,11 @@ export class WebhookController {
     }
 
     const fileAnalyses: FileAnalysis[] = await Promise.all(fileAnalysesPromises);
-    this.logger.log({ message: 'Webhook processed', fileAnalyses });
+    const redactedFileAnalyses = fileAnalyses.map(analysis => ({
+      ...analysis,
+      commitAuthor: 'REDACTED'
+    }));
+    this.logger.log({ message: 'Webhook processed', redactedFileAnalyses });
 
     if (fileAnalyses[0].commitAuthor) {
       const subject = 'Your Automated Code Review';
