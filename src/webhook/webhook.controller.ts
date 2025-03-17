@@ -1,5 +1,5 @@
 import { Controller, Post, Body, Headers, HttpException, HttpStatus, Logger } from '@nestjs/common';
-import fetch from 'node-fetch'; // Make sure to install node-fetch if you're using Node 16 or below
+import fetch from 'node-fetch';
 
 interface PythonResponse {
   openai_feedback: string;
@@ -21,6 +21,8 @@ export class WebhookController {
 
   constructor(private readonly logger: Logger) {}
 
+  private readonly MIN_CONTENT_LENGTH = 50;
+  
   @Post()
   async handleWebhook(
     @Headers('x-github-event') event: string,
@@ -39,6 +41,15 @@ export class WebhookController {
       const modifiedFiles = commit.modified || [];
       return modifiedFiles.map(async filename => {
         const fileContent = commit.message || "No content provided";
+
+        // Adding this to skip review when commits are too irrelavant or small changes.
+        if (fileContent.length < this.MIN_CONTENT_LENGTH) {
+          this.logger.log(`Skipping file ${filename} due to insufficient content length`);
+          return {
+            filename,
+            aiFeedback: "Insufficient content",
+          } as FileAnalysis;
+        }
 
         this.logger.log(`Processing file: ${filename}`);
 
