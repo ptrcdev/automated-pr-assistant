@@ -32,6 +32,7 @@ export class WebhookController {
 
     const commits: Commit[] = payload.commits || [];
     const pythonApiUrl = process.env.PYTHON_API_URL || "http://localhost:8000/analyze";
+    
     if (!pythonApiUrl) {
       this.logger.error("Python API URL is not configured");
       throw new HttpException("Python API URL is not configured", HttpStatus.INTERNAL_SERVER_ERROR);
@@ -41,6 +42,8 @@ export class WebhookController {
       const modifiedFiles = commit.modified || [];
       return modifiedFiles.map(async filename => {
         const fileContent = commit.message || "No content provided";
+
+        this.logger.log(fileContent, fileContent.length);
 
         // Adding this to skip review when commits are too irrelavant or small changes.
         if (fileContent.length < this.MIN_CONTENT_LENGTH) {
